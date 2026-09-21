@@ -1,6 +1,35 @@
-pandas
-torch
-numpy
-matplotlib
-scikit-learn
-scipy
+# 음성 딥페이크 탐지 — 런타임 의존성 (CPU 기준 고정)
+#
+# 설치:
+#   pip install -r requirements.txt
+# CPU 전용 torch 휠을 쓰려면(이미지/용량 절감):
+#   pip install -r requirements.txt \
+#     --index-url https://download.pytorch.org/whl/cpu \
+#     --extra-index-url https://pypi.org/simple
+
+# ── 수치 계산 ────────────────────────────────────────────────
+numpy==2.4.6
+scipy==1.17.1                 # optimize.brentq(EER), interpolate.interp1d
+
+# ── 딥러닝 ──────────────────────────────────────────────────
+torch==2.14.0
+torchvision==0.29.0           # models.resnet18 (src/models/resnet_detector.py)
+
+# ── 오디오 I/O · 특징 추출 ──────────────────────────────────
+librosa==0.11.0               # melspectrogram, power_to_db, display.specshow
+soundfile==0.14.0             # flac/wav 읽기·쓰기 (시스템 libsndfile 필요)
+
+# ── 신호처리 ────────────────────────────────────────────────
+PyWavelets==1.9.0             # pywt.cwt('morl'), pywt.wavedec('db4')
+
+# ── 평가 · 시각화 ───────────────────────────────────────────
+scikit-learn==1.9.1           # metrics.roc_curve
+matplotlib==3.11.2
+
+# ── 선택 의존성 (사전 실험 샘플 확보용 폴백 경로) ───────────
+# src/download_asvspoof_sample.py 와 src/experiment_wavelet_verification.py 는
+# 아래 패키지를 try/except 안에서만 사용한다. 없으면 다른 경로로 폴백하므로
+# 핵심 파이프라인(학습·평가) 실행에는 필요하지 않다.
+#   torchaudio        # torchaudio.datasets.YESNO 폴백
+#   huggingface-hub   # hf_hub_download 폴백
+#   datasets          # load_dataset 폴백

@@ -112,8 +112,12 @@ ASVspoof 전체 학습에 앞서, 웨이블릿 분해가 진짜/합성 음성을
 ```
 .
 ├── run_experiment.sh                  # 베이스라인 → 이중 파이프라인 전체 실험 실행
-├── requirements.txt
+├── Makefile                           # setup / lint / smoke / reproduce / clean
+├── Dockerfile                         # CPU 재현 환경 (libsndfile·ffmpeg 포함)
+├── DATA.md                            # ASVspoof 2019 LA 내려받기·배치 안내
+├── requirements.txt                   # 버전 고정 의존성
 ├── src/
+│   ├── seed.py                        # random/numpy/torch 시드 일괄 고정
 │   ├── preprocessing/
 │   │   ├── audio_features.py          # 멜 / CWT 스칼로그램 / db4 에너지 / 이중 결합
 │   │   └── dataset.py                 # ASVspoof 2019 LA 프로토콜 파서 + Dataset/DataLoader
@@ -142,8 +146,11 @@ ASVspoof 전체 학습에 앞서, 웨이블릿 분해가 진짜/합성 음성을
 
 ```bash
 pip install -r requirements.txt
-pip install librosa pywavelets torchvision soundfile   # requirements.txt 외 런타임 의존성
 ```
+
+`librosa` · `soundfile` · `torchvision` · `PyWavelets` 는 모두 `requirements.txt` 에 버전 고정으로 포함되어 있다.
+`soundfile` 은 시스템 라이브러리 `libsndfile` 을 필요로 한다 (macOS: `brew install libsndfile`,
+Debian/Ubuntu: `apt install libsndfile1`). 버전까지 고정된 환경이 필요하면 아래 [재현](#재현) 절의 Docker를 쓴다.
 
 ### 2. 데이터 배치
 
@@ -183,6 +190,79 @@ python3 src/training/eval_only.py
 ```bash
 python3 src/download_asvspoof_sample.py   # 샘플 오디오 준비
 python3 src/run_real_experiment.py        # 웨이블릿 검증 + 그래프 → docs/images/
+```
+
+---
+
+## 재현
+
+위 "실행 방법"이 로컬 파이썬 환경 기준이라면, 이 절은 **환경째로 고정해 한 명령으로 돌리는** 경로다.
+
+### 데이터 준비
+
+ASVspoof 2019 LA는 용량·라이선스(ODC-By) 때문에 저장소에 포함하지 않았다.
+내려받는 곳과 배치 경로는 [DATA.md](DATA.md)에 정리했다.
+
+### Makefile
+
+```bash
+make help       # 타깃 목록
+make setup      # requirements.txt 설치 (CPU torch 휠)
+make lint       # src/ 문법 검사
+make smoke      # 데이터셋 없이 파이프라인 동작 확인
+make reproduce  # dev EER 비교 실험 재현 (데이터셋 필요)
+make clean      # 캐시·중간 산출물 정리
+```
+
+| 타깃 | 하는 일 | 데이터 필요 | 소요 시간 |
+|---|---|---|---|
+| `make smoke` | 합성 난수 오디오 2초로 멜 → 웨이블릿 → 2채널 스택 → ResNet-18 forward 통과 확인 | ✗ | 수 초 |
+| `make lint` | `compileall` + `ruff`(설치 시, 문법·미정의 이름 규칙만) | ✗ | 1초 미만 |
+| `make pretest` | 웨이블릿 사전 실험 재현 (YESNO 샘플 자동 다운로드 + 합성 가짜 음성) | ✗ (네트워크 필요) | 수 분 |
+| `make train-baseline` | 멜 단일 + ResNet-18, 5,000 utterance · 10 epoch | **✓** | GPU 수십 분 / CPU는 훨씬 김 |
+| `make train-dual` | 멜+웨이블릿 이중 + ResNet-18, 동일 조건 | **✓** | CWT 연산 때문에 baseline보다 오래 걸림 |
+| `make reproduce` | `train-baseline` → `train-dual` 순차 실행 후 체크포인트 비교 | **✓** | 위 둘의 합 |
+| `make eval` | 저장된 체크포인트로 EER 재측정 | 체크포인트 필요 | 수 분 |
+
+주요 변수는 덮어쓸 수 있다.
+
+```bash
+make reproduce DATA_DIR=/mnt/asvspoof/LA MAX_SAMPLES=1000 EPOCHS=3
+```
+
+> **소요 시간 주의** — 위 학습 시간은 추정치다. 본 재현 레이어를 정비하는 시점에
+> ASVspoof 데이터가 로컬에 없어 `make reproduce` 를 끝까지 돌려 실측하지 못했다.
+> 데이터 없이 검증한 것은 `make lint` 와 `make smoke` 다.
+
+### Docker
+
+CPU 전용 이미지로 파이썬·네이티브 라이브러리(libsndfile, ffmpeg) 버전까지 고정한다.
+
+```bash
+make docker-build          # = docker build -t voice-deepfake:cpu .
+make docker-shell          # 데이터·체크포인트 볼륨을 붙여 셸 진입
+```
+
+이미지에는 **소스만** 들어간다. 데이터셋과 체크포인트는 볼륨으로 마운트한다.
+
+```bash
+docker run --rm -it \
+  -v "$PWD/datasets:/app/datasets" \
+  -v "$PWD/checkpoints:/app/checkpoints" \
+  voice-deepfake:cpu \
+  make reproduce
+```
+
+### 시드 고정
+
+`src/seed.py` 의 `set_seed()` 가 `random` · `numpy` · `torch`(+cuDNN deterministic)를 한 번에 고정한다.
+기본값 42는 `src/preprocessing/dataset.py` 가 서브셋 샘플링에 쓰는 기존 시드와 같은 값이며,
+기존 동작을 덮어쓰지 않는다.
+
+```python
+from src.seed import set_seed
+set_seed()            # 42
+set_seed(1234, deterministic=False)   # GPU 속도 우선
 ```
 
 ---
