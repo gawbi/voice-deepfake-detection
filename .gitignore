@@ -1,0 +1,82 @@
+# ===== 데이터셋 (대용량) =====
+datasets/
+data/
+*.flac
+*.wav
+*.npy
+*.zip
+*.tar
+*.tar.gz
+
+# ===== 모델 체크포인트 =====
+checkpoints/
+*.pt
+*.pth
+*.ckpt
+*.h5
+*.onnx
+*.safetensors
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+build/
+dist/
+*.egg-info/
+.eggs/
+.venv/
+venv/
+env/
+ENV/
+.python-version
+
+# ===== Jupyter =====
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/*
+profile_default/
+ipython_config.py
+
+# ===== 테스트 / 타입체크 캐시 =====
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ===== 환경변수 / 시크릿 =====
+.env
+.env.*
+*.key
+*.pem
+secrets.json
+
+# ===== IDE =====
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ===== macOS / Windows =====
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+Thumbs.db
+desktop.ini
+
+# ===== 실험 산출물 (재생성 가능) =====
+src/experiment_results/
+runs/
+logs/
+wandb/
+*.log
+
+# ===== 제출 서류 / 개인 문서 (비공개) =====
+*.pdf
+*.docx
+*.hwp
+*.hwpx
+*.pptx
+resume_or_portfolio/
