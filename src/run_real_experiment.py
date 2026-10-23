@@ -66,7 +66,7 @@ def create_main_comparison(real, spoof, output_path):
     fig, axes = plt.subplots(2, 3, figsize=(20, 11))
     fig.suptitle(
         'Dual Pipeline Verification: Real Voice vs TTS-Simulated Voice\n'
-        '(Wavelet preprocessing from defense research applied to audio domain)',
+        '(Wavelet preprocessing from spectral-signal research applied to audio domain)',
         fontsize=15, fontweight='bold', y=0.98
     )
 
